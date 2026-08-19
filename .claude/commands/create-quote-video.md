@@ -52,7 +52,7 @@ description: 원본 실사 영상 + 컷별 자막 대본 + BGM으로 최종 명�
 ```bash
 python -m src.quote_video.pipeline \
   --video assets/videos/명품대게.mp4 \
-  --caption assets/caption/명품대게_릴스_자막.md \
+  --caption assets/caption/자막.md \
   --bgm assets/bgm/default.mp3 \
-  --output output/명품대게_final.mp4
+  --output output/result.mp4
 ```

@@ -3,6 +3,8 @@ from pathlib import Path
 
 from src.quote_video import config
 from src.quote_video.subtitle_sync import (
+    _strip_markdown,
+    build_ass,
     build_srt,
     compute_timings,
     parse_caption_script,
@@ -10,19 +12,57 @@ from src.quote_video.subtitle_sync import (
 )
 
 FIXTURE = Path(__file__).parent / "fixtures" / "sample_caption.md"
+TIMESTAMPED_FIXTURE = Path(__file__).parent / "fixtures" / "sample_caption_timestamped.md"
 
 
 class TestParseCaptionScript(unittest.TestCase):
     def test_parses_all_16_cuts_in_order(self):
         lines = parse_caption_script(FIXTURE)
         self.assertEqual(len(lines), 16)
-        self.assertEqual([line.cut_number for line in lines], list(range(1, 17)))
+        self.assertEqual([line.sequence_number for line in lines], list(range(1, 17)))
         self.assertEqual(lines[0].text, "포항중앙수산시장에 오시면")
         self.assertEqual(lines[-1].text, "지금 바로 입안 가득 바다를 즐겨보세요!")
 
     def test_missing_file_raises(self):
         with self.assertRaises(FileNotFoundError):
             parse_caption_script(Path("does/not/exist.md"))
+
+    def test_inline_bold_markup_inside_cut_text_is_stripped(self):
+        # cut 4 in the fixture: "* **4컷:** 상호명 **명품대게**를 꼭 방문해 보세요!"
+        lines = parse_caption_script(FIXTURE)
+        cut_4 = next(line for line in lines if line.sequence_number == 4)
+        self.assertEqual(cut_4.text, "상호명 명품대게를 꼭 방문해 보세요!")
+        self.assertNotIn("*", cut_4.text)
+
+    def test_current_bracketed_timestamp_format_is_also_accepted(self):
+        # "* **[00:00 ~ 00:01] 자막 1:** text" — the format actually in
+        # assets/caption/ now (2026-08-20), distinct from the older
+        # "**N컷:**" format above. The bracketed timestamp is decorative;
+        # only the "자막 N" sequence number is read.
+        lines = parse_caption_script(TIMESTAMPED_FIXTURE)
+        self.assertEqual(len(lines), 16)
+        self.assertEqual([line.sequence_number for line in lines], list(range(1, 17)))
+        self.assertEqual(lines[0].text, "포항 여행의 완벽한 마침표")
+        self.assertEqual(lines[-1].text, "놓치지 말고 지금 바로 즐겨보세요!")
+        # the "## [비디오 컷 N]" section headers must not be mistaken for caption lines
+        self.assertNotIn("비디오", " ".join(line.text for line in lines))
+
+
+class TestStripMarkdown(unittest.TestCase):
+    def test_strips_bold(self):
+        self.assertEqual(_strip_markdown("상호명 **명품대게**를 꼭"), "상호명 명품대게를 꼭")
+
+    def test_strips_italic_without_touching_bold(self):
+        self.assertEqual(_strip_markdown("**bold** and *italic*"), "bold and italic")
+
+    def test_strips_underscore_bold_and_backticks(self):
+        self.assertEqual(_strip_markdown("__bold__ and `code`"), "bold and code")
+
+    def test_strips_stray_leftover_markers(self):
+        self.assertEqual(_strip_markdown("odd * marker"), "odd  marker")
+
+    def test_plain_text_is_unchanged(self):
+        self.assertEqual(_strip_markdown("포항중앙수산시장에 오시면"), "포항중앙수산시장에 오시면")
 
 
 class TestComputeTimings(unittest.TestCase):
@@ -67,6 +107,42 @@ class TestBuildSrt(unittest.TestCase):
         self.assertIn("2\n00:00:01,000 --> 00:00:02,000\n", srt)
         self.assertIn("16\n00:00:15,000 --> 00:00:16,000\n", srt)
         self.assertEqual(srt.count("-->"), 16)
+
+
+class TestBuildAss(unittest.TestCase):
+    def test_play_res_matches_requested_canvas(self):
+        lines = parse_caption_script(FIXTURE)
+        timings = compute_timings(lines)
+        ass = build_ass(timings, width=1080, height=1920)
+
+        self.assertIn("PlayResX: 1080", ass)
+        self.assertIn("PlayResY: 1920", ass)
+
+    def test_margin_v_and_font_name_land_in_the_style_line(self):
+        lines = parse_caption_script(FIXTURE)
+        timings = compute_timings(lines)
+        ass = build_ass(timings, font_name="Jayeon Sans Medium", margin_v=220)
+
+        style_line = next(line for line in ass.splitlines() if line.startswith("Style: Default,"))
+        self.assertIn("Jayeon Sans Medium", style_line)
+        self.assertIn(",220,1", style_line)  # ...,MarginV,Encoding
+
+    def test_dialogue_timestamps_and_text(self):
+        lines = parse_caption_script(FIXTURE)
+        timings = compute_timings(lines)
+        ass = build_ass(timings)
+
+        self.assertIn("Dialogue: 0,0:00:00.00,0:00:01.00,Default,,0,0,0,,포항중앙수산시장에 오시면", ass)
+        self.assertIn("Dialogue: 0,0:00:15.00,0:00:16.00,Default,,0,0,0,,지금 바로 입안 가득 바다를 즐겨보세요!", ass)
+        self.assertEqual(ass.count("Dialogue:"), 16)
+
+    def test_curly_braces_in_text_are_escaped(self):
+        from src.quote_video.subtitle_sync import CaptionLine, CaptionTiming
+
+        timing = CaptionTiming(line=CaptionLine(sequence_number=1, text="weird {tag} text"), start=0.0, end=1.0)
+        ass = build_ass([timing])
+        self.assertNotIn("{tag}", ass)
+        self.assertIn("(tag)", ass)
 
 
 if __name__ == "__main__":
