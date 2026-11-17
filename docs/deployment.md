@@ -15,3 +15,5 @@ POSTALK 백엔드에는 `REELS_API_URL=http://<릴스 서비스 이름>.railway.
 `POST /reels/renders`는 장면별 `media[].download_url`과 결과 저장용 `uploads.video_url`, `uploads.thumbnail_url`을 받습니다. 백엔드는 같은 작업 ID로 등록을 다시 요청하고, 상태 조회로 완료를 확인합니다. 렌더 작업 상태는 Python 프로세스에 저장되며 재시작하면 백엔드에서 작업을 다시 등록합니다. 완성 영상과 썸네일은 Supabase에 저장합니다.
 
 영상에 템플릿의 배경음악과 자막이 들어갑니다. 원본 영상의 현장음은 제거합니다. 백엔드가 렌더링 전에 대본 API를 호출해 장면 자막·게시글 캡션·해시태그를 받습니다.
+
+동시에 작업을 처리하는 컨테이너에서 FFmpeg가 스레드를 과도하게 만들지 않도록 필터·영상 코덱의 작업 스레드를 2개로 제한합니다. 가로 영상의 흐린 배경 합성에서 `Failed to configure output pad` 또는 `Resource temporarily unavailable` 오류가 발생하면 배포 버전과 컨테이너 자원을 함께 확인합니다.

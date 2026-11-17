@@ -390,12 +390,14 @@ def build_ffmpeg_command(
         f"afade=t=out:st={fade_out_start}:d={fade_duration}[aout]"
     )
 
-    command = ["ffmpeg", "-y"]
+    # Bound filter and codec workers when multiple renders share a container.
+    # FFmpeg's automatic CPU count can exceed the container's thread budget.
+    command = ["ffmpeg", "-y", "-filter_complex_threads", "2"]
     for clip in scene_clips:
-        command += ["-i", str(clip.media_path)]
+        command += ["-threads", "2", "-i", str(clip.media_path)]
     command += ["-i", str(bgm_path)]
     if animated_overlay_path:
-        command += ["-stream_loop", "-1", "-i", str(animated_overlay_path)]
+        command += ["-threads", "2", "-stream_loop", "-1", "-i", str(animated_overlay_path)]
     if overlay_path:
         command += ["-i", str(overlay_path)]
     command += [
@@ -403,6 +405,7 @@ def build_ffmpeg_command(
         "-map", "[vout]",
         "-map", "[aout]",
         "-c:v", "libx264",
+        "-threads", "2",
         "-pix_fmt", "yuv420p",
         "-preset", preset,
         "-r", str(fps),
