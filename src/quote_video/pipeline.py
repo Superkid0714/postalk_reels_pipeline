@@ -158,6 +158,7 @@ def run_pipeline(
         height=canvas["height"],
         fps=canvas["fps"],
         preset=render_cfg.get("ffmpeg_preset", config.FFMPEG_PRESET),
+        landscape_fit=render_cfg.get("landscape_fit"),
         deadline=deadline,
     )
     return PipelineResult(output_path=output_path, duration_sec=sum(d for _, d in scene_specs))
