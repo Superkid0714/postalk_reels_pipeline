@@ -8,3 +8,9 @@ storage/
 .env
 .env.*
 !.env.example
+
+# Local environments and assistant configuration
+.venv/
+.claude/
+.pytest_cache/
+.ruff_cache/
