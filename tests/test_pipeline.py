@@ -59,6 +59,11 @@ class TestRunPipelineDeadline(unittest.TestCase):
         self.assertGreater(closeup, detail)
         self.assertAlmostEqual(hook + closeup + detail + outro, 16.0)
 
+    def test_cover_timestamp_is_in_first_menu_scene(self):
+        result = run_pipeline(self.request, MEDIA_ROOT, Path("output/final.mp4"))
+        specs = self.mock_compose.call_args.args[0]
+        self.assertAlmostEqual(result.thumbnail_at_sec, specs[0][1] + specs[1][1] / 2)
+
     def test_bgm_and_subtitle_settings_come_from_the_template(self):
         run_pipeline(self.request, MEDIA_ROOT, Path("output/final.mp4"))
         kwargs = self.mock_compose.call_args.kwargs

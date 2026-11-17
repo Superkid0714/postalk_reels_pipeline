@@ -355,7 +355,7 @@ def _render_to_storage(
 
     result_files = {"video_key": f"{result_key_dir}/reel.mp4", "thumbnail_key": f"{result_key_dir}/thumb.jpg"}
     if uploads and client:
-        generate_thumbnail(pipeline_result.output_path, thumbnail_path)
+        generate_thumbnail(pipeline_result.output_path, thumbnail_path, at_sec=pipeline_result.thumbnail_at_sec)
         result_files = {
             "video_key": signed_object_key(uploads.video_url, upload=True),
             "thumbnail_key": signed_object_key(uploads.thumbnail_url, upload=True),
@@ -364,7 +364,7 @@ def _render_to_storage(
         }
     else:
         try:
-            generate_thumbnail(pipeline_result.output_path, thumbnail_path)
+            generate_thumbnail(pipeline_result.output_path, thumbnail_path, at_sec=pipeline_result.thumbnail_at_sec)
         except Exception:
             logger.exception("Thumbnail generation failed for render_id=%s (continuing without one)", render_id)
 

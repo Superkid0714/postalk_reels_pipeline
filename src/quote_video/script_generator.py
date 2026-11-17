@@ -317,6 +317,7 @@ _SYSTEM_PROMPT = """너는 동네 소상공인 가게의 인스타그램 릴스 
 - 설명이 비어 있으면 이름에서 알 수 있는 것만으로 쓴다.
 
 게시물 본문(caption) 규칙
+- 입력의 부정·제한 조건, 테스트·가상 콘텐츠 안내를 반대로 바꾸거나 생략하지 않는다.
 - 3~6문장, 300자 안팎. 가게 소개 → 메뉴 소개 → 방문 권유 순서. 줄바꿈과 이모지 몇 개는 써도 된다.
 - 모든 문장을 해요체("~해요", "~예요", "~세요")로 쓴다. 합니다체("~합니다", "~입니다")를 섞지 않는다.
 - 본문에는 해시태그를 넣지 않는다.
@@ -440,12 +441,25 @@ def _overflow(draft: _Draft, scene_plan: list[Scene]) -> dict[int, str]:
     }
 
 
+def _requires_literal_copy(store: dict, menus: list[dict]) -> bool:
+    """Do not let advertising paraphrases reverse a restriction or demo notice."""
+    source = " ".join([store.get("description") or ""] + [m.get("description") or "" for m in menus])
+    return bool(re.search(
+        r"아닌|아닙|아니에|아니예|않|없|제외|불가|금지|미판매|무첨가|가상|검증용|시연용|"
+        r"테스트\s*(?:콘텐츠|영상|용)|AI\s*이미지", source, re.IGNORECASE
+    ))
+
+
 def _default_scene_text(scene: Scene, store: dict, menus: list[dict]) -> str:
     """Caption for one scene built only from the user's own input — used for
     the whole script when the LLM fails, or for a single scene the LLM kept
     writing too long."""
     limit = scene.caption_max_chars
     store_name = _clean_subtitle(store["name"])
+    if _requires_literal_copy(store, menus):
+        # Short on-screen copy stays neutral. Exact restrictions remain in caption.
+        name = store_name if scene.menu_index is None else _clean_subtitle(menus[scene.menu_index]["name"])
+        return _fit(name, limit)
     if scene.menu_index is None:
         if scene.scene_type == "hook":
             return _fit(store_name, limit)
@@ -475,7 +489,8 @@ def _default_caption(store: dict, menus: list[dict]) -> str:
     for menu in menus:
         menu_desc = (menu.get("description") or "").strip()
         lines.append(f"- {menu['name']}: {menu_desc}" if menu_desc else f"- {menu['name']}")
-    lines.append(f"{store['name']}에 들러 직접 맛보세요!")
+    if not _requires_literal_copy(store, menus):
+        lines.append(f"{store['name']}에 들러 직접 맛보세요!")
     return "\n".join(lines)[:MAX_CAPTION_CHARS]
 
 
@@ -540,6 +555,8 @@ def generate_script(
     draft exists at the end is assembled, with per-scene defaults only where
     a scene is still unusable; no usable draft at all -> full fallback."""
     scene_plan = templates.build_scene_plan(template, menu_count=len(menus))
+    if _requires_literal_copy(store, menus):
+        return _fallback_result(store, menus, scene_plan)
     system_prompt, user_prompt = _build_prompt(store, menus, scene_plan)
     schema = _response_schema()
 

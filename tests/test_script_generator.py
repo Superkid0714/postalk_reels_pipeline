@@ -483,3 +483,24 @@ class TestExtractPrice(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class TestProtectedMeaning(unittest.TestCase):
+    def test_demo_notice_is_preserved_without_sales_invitation(self):
+        store = {"name": "크리스마스 쿠키", "description": "실제 판매점이 아닌 서비스 검증용 가상 베이커리입니다."}
+        menus = [{"menu_index": 0, "name": "아이싱 쿠키", "description": "AI 이미지 기반 서비스 테스트 콘텐츠입니다."}]
+        client = FakeLlmClient([])
+        result = generate_script(store, menus, templates.load_template("christmas"), llm_client=client)
+        self.assertEqual(client.calls, [])
+        self.assertIn(store["description"], result.caption)
+        self.assertIn(menus[0]["description"], result.caption)
+        self.assertNotIn("맛보세요", result.caption)
+        self.assertTrue(all(scene.text in ("크리스마스 쿠키", "아이싱 쿠키") for scene in result.scenes))
+        self.assertTrue(all(len(scene.text) <= scene.max_chars for scene in result.scenes))
+
+    def test_menu_restrictions_remain_literal(self):
+        for description in ("포장만 가능하고 매장 식사는 불가합니다.", "견과류가 들어 있지 않습니다.", "설탕 무첨가", "주말 판매 제외"):
+            with self.subTest(description=description):
+                menus = [{"menu_index": 0, "name": "쿠키", "description": description}]
+                result = generate_script(STORE, menus, templates.load_template("simple"), llm_client=FakeLlmClient([]))
+                self.assertIn(description, result.caption)
+                self.assertNotIn("직접 맛보세요", result.caption)

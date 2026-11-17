@@ -336,7 +336,7 @@ class TestBuildThumbnailCommand(unittest.TestCase):
 
 class TestGenerateThumbnail(unittest.TestCase):
     def test_creates_parent_dir_and_runs_ffmpeg(self):
-        with patch("src.quote_video.video_composer._run") as mock_run:
+        with patch("src.quote_video.video_composer._run") as mock_run,              patch("src.quote_video.video_composer.probe_duration", return_value=16),              patch("src.quote_video.video_composer._thumbnail_score", return_value=80):
             with patch("src.quote_video.video_composer.Path.mkdir") as mock_mkdir:
                 generate_thumbnail(Path("final.mp4"), Path("out/thumb.jpg"))
         mock_mkdir.assert_called_once()
@@ -446,3 +446,16 @@ class TestProbeDisplayAspect(unittest.TestCase):
     def test_rotated_phone_clip_is_portrait(self):
         stream = {"width": 1920, "height": 1080, "side_data_list": [{"rotation": -90}]}
         self.assertAlmostEqual(self._probe(stream), 9 / 16)
+
+class TestThumbnailSelection(unittest.TestCase):
+    def test_dark_preferred_frame_selects_bright_scene_interior(self):
+        with patch("src.quote_video.video_composer._run") as run,              patch("src.quote_video.video_composer.Path.mkdir"),              patch("src.quote_video.video_composer.probe_duration", return_value=16),              patch("src.quote_video.video_composer._thumbnail_score", side_effect=[0, 20, 100, 30]):
+            generate_thumbnail(Path("final.mp4"), Path("thumb.jpg"), at_sec=5.5)
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index("-ss") + 1], "8.000")
+
+    def test_short_clip_clamps_timestamp(self):
+        with patch("src.quote_video.video_composer._run") as run,              patch("src.quote_video.video_composer.Path.mkdir"),              patch("src.quote_video.video_composer.probe_duration", return_value=0.4),              patch("src.quote_video.video_composer._thumbnail_score", return_value=100):
+            generate_thumbnail(Path("final.mp4"), Path("thumb.jpg"), at_sec=5.5)
+        command = run.call_args.args[0]
+        self.assertEqual(command[command.index("-ss") + 1], "0.000")

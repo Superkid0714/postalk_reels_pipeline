@@ -470,13 +470,13 @@ def compose_video(
 
 
 def build_thumbnail_command(
-    video_path: Path, output_path: Path, *, at_sec: float = 0.3, quality: int = 2
+    video_path: Path, output_path: Path, *, at_sec: float = 1.0, quality: int = 2
 ) -> list[str]:
     """Build the ffmpeg argv that grabs a single JPG frame from the
     already-composed final MP4 — not the raw hook footage, since the final
     video is already cropped/letterboxed to the right 1080x1920 canvas, so
-    grabbing straight from it needs no extra scaling. `at_sec` defaults to
-    just past the start (not frame 0) to skip the fade-in. Pure/testable:
+    grabbing straight from it needs no extra scaling. The caller supplies a
+    scene-interior timestamp after checking brightness. Pure/testable:
     does not touch the filesystem or require ffmpeg installed."""
     return [
         "ffmpeg", "-y",
@@ -489,14 +489,40 @@ def build_thumbnail_command(
     ]
 
 
+def _thumbnail_score(video_path: Path, at_sec: float, *, deadline: float | None) -> float:
+    # Measure the central product region rather than bright borders/blurred bars.
+    result = _run([
+        "ffmpeg", "-v", "error", "-ss", f"{at_sec:.3f}", "-i", str(video_path),
+        "-frames:v", "1", "-vf", "crop=iw*0.8:ih*0.6,scale=64:64,format=gray",
+        "-threads", "2", "-f", "rawvideo", "pipe:1",
+    ], deadline=deadline, check=True, capture_output=True)
+    pixels = result.stdout
+    if not pixels:
+        return 0.0
+    return sum(pixels) / len(pixels)
+
+
 def generate_thumbnail(
-    video_path: Path, output_path: Path, *, at_sec: float = 0.3, deadline: float | None = None
+    video_path: Path, output_path: Path, *, at_sec: float = 1.0, deadline: float | None = None
 ) -> Path:
-    """docs/reels-api-spec.md: "썸네일은 훅 장면에서 뽑은 1080×1920 JPG." The
-    composed video's first ~2s *is* the hook scene (see templates.py's
-    scene order), so a frame near the start always comes from it."""
+    """Create a 1080x1920 product cover from the composed video.
+
+    Prefer the middle of the first closeup (passed by the pipeline). If dark,
+    compare later scene interiors; never blindly choose the fade-in frame.
+    """
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    command = build_thumbnail_command(video_path, output_path, at_sec=at_sec)
+    deadline = deadline if deadline is not None else time.monotonic() + 15
+    duration = probe_duration(video_path, deadline=deadline)
+    latest = max(0.0, duration - 0.5)
+    preferred = min(max(0.0, at_sec), latest)
+    selected = preferred
+    best = _thumbnail_score(video_path, preferred, deadline=deadline)
+    if best < 35:
+        for candidate in dict.fromkeys(min(latest, duration * fraction) for fraction in (0.25, 0.5, 0.7)):
+            score = _thumbnail_score(video_path, candidate, deadline=deadline)
+            if score > best:
+                selected, best = candidate, score
+    command = build_thumbnail_command(video_path, output_path, at_sec=selected)
     _run(command, deadline=deadline, check=True)
     return output_path

@@ -35,6 +35,7 @@ class PipelineResult:
     output_path: Path
     duration_sec: float
     bgm_path: Path | None = None
+    thumbnail_at_sec: float = 1.0
 
 
 def pick_bgm_path(audio_cfg: dict, rng: random.Random | None = None) -> Path:
@@ -109,11 +110,14 @@ def run_pipeline(
     scene_specs: list[tuple[Path, float]] = []
     timings: list[CaptionTiming] = []
     start = 0.0
+    thumbnail_at_sec = None
     for rs in render_scenes:
         media_path = media_root / rs.media_key
         if not media_path.exists():
             raise NoUsableMediaError(f"scene_index {rs.scene.scene_index}: no such file {media_path}")
         duration = rebalanced_by_index[rs.scene.scene_index].duration_sec
+        if thumbnail_at_sec is None and rs.scene.scene_type == "closeup":
+            thumbnail_at_sec = start + duration / 2
         scene_specs.append((media_path, duration))
         timings.append(
             CaptionTiming(
@@ -177,7 +181,7 @@ def run_pipeline(
         landscape_fit=render_cfg.get("landscape_fit"),
         deadline=deadline,
     )
-    return PipelineResult(output_path=output_path, duration_sec=sum(d for _, d in scene_specs), bgm_path=bgm_path)
+    return PipelineResult(output_path=output_path, duration_sec=sum(d for _, d in scene_specs), bgm_path=bgm_path, thumbnail_at_sec=thumbnail_at_sec or 1.0)
 
 
 def main() -> None:

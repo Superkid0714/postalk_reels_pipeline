@@ -244,7 +244,7 @@ BGM은 콘셉트별 곡 목록(`audio.bgm_tracks`, 심플 4곡·크리스마스 
 
 - result는 done일 때만 채워진다. `video_key`·`thumbnail_key`는 `uploads`로 받은 업로드 URL의 객체 경로(`uploads` 버킷 기준)이고, `video_bytes`·`thumbnail_bytes`는 실제로 올린 파일 크기다. Next.js는 이 경로를 브라우저에서 열리는 URL로 바꿔 프론트에 전달한다.
 - 로컬 개발(`uploads` 없음)에서는 `video_key`가 `results/{user_id}/{ad_id}/reel.mp4`, `thumbnail_key`가 `results/{user_id}/{ad_id}/thumb.jpg`이고 `*_bytes`는 없다.
-- 썸네일은 훅 장면에서 뽑은 1080×1920 JPG. 홈·보관함 목록에서 영상 대신 쓴다. Supabase 연동에서는 썸네일 생성·업로드가 실패하면 작업 전체가 `RENDER_FAILED`가 된다.
+- 썸네일은 첫 메뉴 클로즈업 중간 프레임을 우선으로 뽑은 1080×1920 JPG. 중앙 영역이 어두우면 영상 25%·50%·70% 지점의 후보 중 가장 밝은 프레임을 선택한다. 홈·보관함 목록에서 영상 대신 쓴다. Supabase 연동에서는 썸네일 생성·업로드가 실패하면 작업 전체가 `RENDER_FAILED`가 된다.
 
 상태 값 (status)
 
@@ -287,3 +287,9 @@ BGM은 콘셉트별 곡 목록(`audio.bgm_tracks`, 심플 4곡·크리스마스 
 error에는 code와 함께 안내 문구(message)를 넣는다.
 
 운영 백엔드는 상태 조회 API로 작업을 확인한다. 릴스 서비스의 선택적 콜백은 `NEXT_BASE_URL`을 설정한 경우 `POST {NEXT_BASE_URL}/api/internal/reels/callback`을 호출한다. 본문은 상태 조회 응답에 `sent_at`을 추가한 형태이며, `REELS_CALLBACK_API_KEY`가 있으면 `X-Internal-Api-Key` 헤더로 전달한다.
+
+## 2026-11-18 표지와 입력 의미 보존
+
+썸네일은 첫 메뉴 클로즈업 중간 프레임을 우선 선택한 1080×1920 JPEG입니다. 중앙 영역의 평균 밝기가 35/255 미만이면 영상 25%·50%·70% 지점도 확인해 가장 밝은 후보를 고릅니다. 기본 시작 지점은 1초이며 영상 길이에 맞춰 제한합니다. 원본 전체가 어두운 경우 밝기를 보장할 수는 없습니다. 백엔드는 완료된 같은 작업의 썸네일을 Instagram 표지(`cover_url`)로 전달합니다. 기존 결과 필드와 요청 형식은 변하지 않습니다.
+
+설명에 부정·제한 조건, 가상·검증·테스트 콘텐츠 안내가 있으면 LLM의 광고식 바꿔쓰기를 건너뛰고 원문 기반 캡션을 사용합니다(`is_fallback=true`). 캡션은 기존 2200자 제한을 적용합니다. 자막은 글자 수 제한에 맞춘 가게·메뉴 이름이며 방문·시식 유도 문구는 추가하지 않습니다. 일반 입력은 기존 AI 생성 흐름을 사용합니다.
