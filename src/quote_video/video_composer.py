@@ -2,7 +2,7 @@
 is fit to its target duration (middle-trim if long enough, slow-down if
 short, slow-down + repeat for very short clips), cropped to fill the 9:16
 canvas (or, for landscape clips when the template asks for it, shown whole
-over a blurred copy of itself — see _frame_filter()), concatenated, burned with ASS captions, faded in/out, and mixed
+over a blurred copy of itself — see _frame_filter()), concatenated, burned with ASS captions, optionally faded in, faded out, and mixed
 with BGM. Per-scene audio is never used — on-site sound is removed entirely.
 """
 
@@ -272,6 +272,7 @@ def build_ffmpeg_command(
     font_name: str,
     margin_v: int,
     bgm_gain_db: float | None = None,
+    fade_in_duration: float | None = None,
     transition_type: str = "fade",
     transition_duration: float = 0.0,
     overlay_path: Path | None = None,
@@ -379,8 +380,12 @@ def build_ffmpeg_command(
         filters.append(f"[{current_label}][voverlay_img]overlay=0:0[voverlay_src]")
         current_label = "voverlay_src"
 
+    intro_fade = fade_duration if fade_in_duration is None else fade_in_duration
+    if intro_fade < 0:
+        raise ValueError("fade_in_duration must not be negative")
+    start_fade = f"fade=t=in:st=0:d={intro_fade}," if intro_fade else ""
     filters.append(
-        f"[{current_label}]fade=t=in:st=0:d={fade_duration},"
+        f"[{current_label}]{start_fade}"
         f"fade=t=out:st={fade_out_start}:d={fade_duration}[vout]"
     )
 

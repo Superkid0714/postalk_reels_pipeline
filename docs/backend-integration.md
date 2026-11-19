@@ -124,3 +124,5 @@ python -m uvicorn src.quote_video.api:app --reload
 백엔드의 전용 복구 워커가 queued/processing 생성 작업을 점검합니다. 실행 중인 작업은 DB 임대 잠금으로 보호하고, 중단 후 임대가 만료되면 같은 작업 ID로 다시 처리합니다. 릴스 서비스의 메모리 작업 상태를 잃은 경우 백엔드는 404 재등록 경로를 사용합니다.
 
 릴스 서비스는 MP4·JPG·자막·캡션을 생성합니다. Instagram 컨테이너 생성, JPEG 표지의 `cover_url` 전달, 게시 완료·중복 방지 확인은 백엔드가 담당합니다. 표지 선택과 문구 보존 정책은 [README](../README.md#표지와-입력-의미-보존), 운영 복구 설정은 [백엔드 운영 문서](https://github.com/Superkid0714/Postalk_backend/blob/main/docs/OPERATIONS.md)를 참고합니다.
+
+새 릴스의 시작 페이드는 사용하지 않아 기존 프론트의 0.1초 미리보기와 호환됩니다. JPG 표지 및 기존 API 응답 형식은 유지합니다. 상세 내용은 [기존 프론트 미리보기 호환](../README.md#기존-프론트-미리보기-호환)을 참고합니다.

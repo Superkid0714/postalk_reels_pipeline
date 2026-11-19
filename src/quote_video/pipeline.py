@@ -167,6 +167,8 @@ def run_pipeline(
         output_path=output_path,
         bgm_volume=template["audio"]["bgm_volume"],
         fade_duration=render_cfg["fade_sec"],
+        # Existing clients preview #t=0.1 without a poster attribute.
+        fade_in_duration=0.0,
         font_name=subtitle_cfg["font_name"],
         margin_v=subtitle_cfg["margin_v"],
         transition_type=transition_cfg["type"],

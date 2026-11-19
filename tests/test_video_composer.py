@@ -153,6 +153,16 @@ class TestBuildFfmpegCommand(unittest.TestCase):
         filter_complex = cmd[cmd.index("-filter_complex") + 1]
         self.assertIn("FontName=Jayeon Sans Medium,MarginV=220", filter_complex)
 
+    def test_no_intro_fade_preserves_first_frame_and_outro_duration(self):
+        cmd = self._build(fade_duration=0.5, fade_in_duration=0.0)
+        graph = cmd[cmd.index("-filter_complex") + 1]
+        self.assertNotIn("fade=t=in:", graph)
+        self.assertIn("fade=t=out:st=6.0:d=0.5", graph)
+
+    def test_negative_intro_fade_is_rejected(self):
+        with self.assertRaises(ValueError):
+            self._build(fade_in_duration=-1)
+
     def test_fade_out_starts_total_duration_minus_fade(self):
         cmd = self._build(fade_duration=0.5)
         filter_complex = cmd[cmd.index("-filter_complex") + 1]

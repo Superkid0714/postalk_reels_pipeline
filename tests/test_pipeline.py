@@ -71,6 +71,10 @@ class TestRunPipelineDeadline(unittest.TestCase):
         self.assertEqual(kwargs["font_name"], "Griun Fromsol")
         self.assertEqual(kwargs["margin_v"], 560)
 
+    def test_existing_client_preview_starts_without_black_fade(self):
+        run_pipeline(self.request, MEDIA_ROOT, Path("output/final.mp4"))
+        self.assertEqual(self.mock_compose.call_args.kwargs["fade_in_duration"], 0.0)
+
     def test_transition_settings_come_from_the_template(self):
         run_pipeline(self.request, MEDIA_ROOT, Path("output/final.mp4"))
         kwargs = self.mock_compose.call_args.kwargs
